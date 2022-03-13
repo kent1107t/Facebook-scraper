@@ -1,6 +1,7 @@
 '''
 環境構築などの参考
 https://qiita.com/Chanmoro/items/9a3c86bb465c1cce738a
+https://stackoverflow-com.translate.goog/questions/56155627/requestsdependencywarning-urllib3-1-25-2-or-chardet-3-0-4-doesnt-match-a-s?_x_tr_sl=en&_x_tr_tl=ja&_x_tr_hl=ja&_x_tr_pto=sc
 webelement の参考
 https://developer.mozilla.org/ja/docs/Web/API/HTMLAnchorElement/href
 https://kurozumi.github.io/selenium-python/api.html#selenium.webdriver.remote.webelement.WebElement
@@ -9,7 +10,8 @@ https://developer.mozilla.org/ja/docs/Web/API/Element/scroll
 https://qiita.com/maruo327/items/36be1a34b88e389bc2b0
 https://kurozumi.github.io/selenium-python/api.html
 https://stackoverflow-com.translate.goog/questions/69095078/how-to-disable-drag-of-a-element-when-dragging-a-horizontal-scrollbar?_x_tr_sl=en&_x_tr_tl=ja&_x_tr_hl=ja&_x_tr_pto=sc
-
+https://www.selenium.dev/ja/documentation/webdriver/elements/finders/
+https://office54.net/python/scraping/selenium-element-iframe
 '''
 import sys
 import doctest
