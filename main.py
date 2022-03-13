@@ -76,6 +76,8 @@ class FacebookScraper:
         self.driver = self.__get_driver()
         # ここでログインするようにしてるけど、たぶん後で変える
         self.login_to_facebook_top_page(my_email_or_number, my_password)
+        # get_info_dict_of_reacted_people で帰る辞書のキー集合
+        self.KEYS_OF_INFO_DICT = set()
 
     def __del__(self):
         self.driver.quit()
@@ -175,10 +177,14 @@ class FacebookScraper:
             '名前': self.driver.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.FULL_NAME.replace(' ', '.')).text,
             'URL' : top_page_url,
         }
+        self.KEYS_OF_INFO_DICT = set()
+        self.KEYS_OF_INFO_DICT |= set(info_dict.keys())
+        self.KEYS_OF_INFO_DICT |= {keyname for mark2keyname in aboutthing2mark2keyname.values() for keyname in mark2keyname.values()}
+        # デフォルトで空文字を入れとく キーをすべてのページで統一するため
+        for keyname in self.KEYS_OF_INFO_DICT:
+            if not keyname in info_dict:  info_dict[keyname] = ''
         # それぞれの項目についてまわっていく
         for about_thing, mark2keyname in aboutthing2mark2keyname.items():
-            # デフォルトで空文字を入れとく キーをすべてのページで統一するため
-            for keyname in mark2keyname.values():  info_dict[keyname] = ''
             self.driver.get(f'{profile_page_url}_{about_thing}')
             # 項目が所属してる上のクラスの要素を取得 一応項目から直接取るんじゃなくて、一回グループとして取る
             sleep(0.4)
@@ -523,7 +529,6 @@ def main():
         print('[4] : 対象とする FaceBook のページ')
         print('[5] : 結果を保存するファイルのパス')
         return
-
     email_or_number  = sys.argv[1]       # ログインに使うメールアドレスまたは電話番号
     password         = sys.argv[2]       # ログインに使うパスワード
     number_of_posts  = int(sys.argv[3])  # 対象とする投稿の数
@@ -536,7 +541,35 @@ def main():
         False,
     )
 
+    # [{{}}] の形で帰る [{リアクションした人のURL : {情報の項目名(名前とか) : その人の情報}}] で各投稿ごとにリストで
     info_dicts_of_reacted_people_per_posts = scraper.get_info_dicts_of_reacted_people_per_posts(target_url, number_of_posts)
+
+    # 表示順で並べたキー集合
+    keynames_on_display_order = [
+        'URL',
+        '名前',
+        '在住',
+        '勤務先',
+        '電話番号',
+        '出身地',
+        '出身校',
+        '交際',
+    ]
+    # 項目のキーから、その情報を表示する列のインデックス
+    keyname2column = {keyname: i for i, keyname in enumerate(keynames_on_display_order, start=1)}
+    for key, col in keyname2column.items():
+        print(f'key = {key}, col = {col}')
+
+    # 各投稿ごとに
+    for info_dicts_of_reacted_people in info_dicts_of_reacted_people_per_posts:
+        # 各人ごとに
+        for url, info_dict in info_dicts_of_reacted_people.items():
+            # 各情報の項目ごとに
+            for key, value in info_dict.items():
+                print(value, end='    ')
+            print()
+        print()
+
     with open(answer_file_path, 'w') as f:
         json.dump(info_dicts_of_reacted_people_per_posts, f, indent=4, ensure_ascii=False)
     return 
