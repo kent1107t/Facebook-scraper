@@ -170,16 +170,15 @@ class FacebookScraper:
         # 基本データのページを取得
         profile_page_url = self.get_profile_page_url_from_top_page_url(top_page_url)
         self.driver.get(profile_page_url)
-        # 返り値の辞書 最初に名前だけ入れとく
-        info_dict = {'Name': self.driver.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.FULL_NAME.replace(' ', '.')).text}
-        '''
-        今の所下のグループ要素のエラー判定で、ビジネスアカウントかどうかを判断してる
-        # ビジネスアカウントかどうかを判別 そうなら下のグループ要素とかが無いのでエラーになっちゃう
-        fiend_or_good_button = self.driver.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.FRIEND_OR_GOOD_BUTTON.replace(' ', '.'))
-        if fiend_or_good_button.text == 'いいね！':  return info_dict
-        '''
+        # 返り値の辞書 最初に名前と URL を入れとく
+        info_dict = {
+            '名前': self.driver.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.FULL_NAME.replace(' ', '.')).text,
+            'URL' : top_page_url,
+        }
         # それぞれの項目についてまわっていく
         for about_thing, mark2keyname in aboutthing2mark2keyname.items():
+            # デフォルトで空文字を入れとく キーをすべてのページで統一するため
+            for keyname in mark2keyname.values():  info_dict[keyname] = ''
             self.driver.get(f'{profile_page_url}_{about_thing}')
             # 項目が所属してる上のクラスの要素を取得 一応項目から直接取るんじゃなくて、一回グループとして取る
             sleep(0.4)
@@ -195,15 +194,14 @@ class FacebookScraper:
                 # read_value は value が優先 もし無い場合に sub_value なので、sub_value を先に入れようとしてる
                 keyname, read_value = self.__get_keyname_by_innerHTML(innerHTML, mark2keyname), ''
                 # 項目によって要素がそもそも存在しない場合が多々あるので、ソースをいちいち確認する
-                if self.classnames.SUB_VALUE_OF_ITEM_OF_ABOUT in innerHTML:
+                if self.classnames.SUB_VALUE_OF_ITEM_OF_ABOUT in innerHTML:  # 説明書きみたいなの 項目がありませんとか 今の職業に対しての以前の職業とか
                     sub_value_elem = item_elem.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.SUB_VALUE_OF_ITEM_OF_ABOUT.replace(' ', '.'))
                     read_value = sub_value_elem.text
-                if self.classnames.VALUE_OF_ITEM_OF_ABOUT in innerHTML:
+                if self.classnames.VALUE_OF_ITEM_OF_ABOUT in innerHTML:      # 今の値
                     value_elem = item_elem.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.VALUE_OF_ITEM_OF_ABOUT.replace(' ', '.'))
                     read_value = value_elem.text
                 info_dict[keyname] = read_value
                 print(f'        info_dict[{keyname}] = {info_dict[keyname]}')
-        #stop()
         return info_dict
     
     
@@ -524,6 +522,7 @@ def main():
         print('[3] : 対象とする投稿の数')
         print('[4] : 対象とする FaceBook のページ')
         print('[5] : 結果を保存するファイルのパス')
+        return
 
     email_or_number  = sys.argv[1]       # ログインに使うメールアドレスまたは電話番号
     password         = sys.argv[2]       # ログインに使うパスワード
