@@ -519,6 +519,40 @@ def test_get_info_dicts_of_reacted_people_per_posts(target_url, number_of_posts,
         json.dump(info_dicts_of_reacted_people_per_posts, f, indent=4, ensure_ascii=False)
     return 
 
+def write_info_dicts_on_xl(info_dicts_of_reacted_people_per_posts: {}, xl_file_path: str) -> None:
+    # xl_file_path のエクセルファイルに、リアクションした人たちの情報を書き込む
+    import openpyxl
+    # ブック・シートを取得
+    wb = openpyxl.load_workbook(xl_file_path)
+    sheet = wb['Sheet1']
+    # 表示順で並べたキー集合
+    keynames_on_display_order = [
+        'URL',
+        '名前',
+        '在住',
+        '勤務先',
+        '電話番号',
+        '出身地',
+        '出身校',
+        '交際',
+    ]
+    # 項目のキーから、その情報を表示する列のインデックス
+    keyname2column = {keyname: i for i, keyname in enumerate(keynames_on_display_order, start=1)}
+    # 今の書き込む行
+    row4write = 1
+    # 各投稿ごとに
+    for info_dicts_of_reacted_people in info_dicts_of_reacted_people_per_posts:
+        # 各人ごとに
+        for url, info_dict in info_dicts_of_reacted_people.items():
+            # 各情報の項目ごとに
+            for key, value in info_dict.items():
+                sheet.cell(row=row4write, column=keyname2column[key], value=value)
+            row4write += 1
+        row4write += 1
+
+    wb.save(xl_file_path)
+    print('エクセルファイルに結果を出力しました。')
+
 
 def main():
     if len(sys.argv) < 5:
@@ -544,32 +578,7 @@ def main():
     # [{{}}] の形で帰る [{リアクションした人のURL : {情報の項目名(名前とか) : その人の情報}}] で各投稿ごとにリストで
     info_dicts_of_reacted_people_per_posts = scraper.get_info_dicts_of_reacted_people_per_posts(target_url, number_of_posts)
 
-    # 表示順で並べたキー集合
-    keynames_on_display_order = [
-        'URL',
-        '名前',
-        '在住',
-        '勤務先',
-        '電話番号',
-        '出身地',
-        '出身校',
-        '交際',
-    ]
-    # 項目のキーから、その情報を表示する列のインデックス
-    keyname2column = {keyname: i for i, keyname in enumerate(keynames_on_display_order, start=1)}
-    for key, col in keyname2column.items():
-        print(f'key = {key}, col = {col}')
-
-    # 各投稿ごとに
-    for info_dicts_of_reacted_people in info_dicts_of_reacted_people_per_posts:
-        # 各人ごとに
-        for url, info_dict in info_dicts_of_reacted_people.items():
-            # 各情報の項目ごとに
-            for key, value in info_dict.items():
-                print(value, end='    ')
-            print()
-        print()
-
+    
     with open(answer_file_path, 'w') as f:
         json.dump(info_dicts_of_reacted_people_per_posts, f, indent=4, ensure_ascii=False)
     return 
