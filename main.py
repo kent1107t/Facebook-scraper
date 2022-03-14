@@ -59,6 +59,9 @@ class ClassNames:
     # プロフィールページの、各情報のリストのサブの説明的なとこのクラス名
     SUB_VALUE_OF_ITEM_OF_ABOUT = 'j5wam9gi e9vueds3 m9osqain'
 
+    # Messenger のボタン
+    MESSENGER_BUTTON = 'oajrlxb2 qu0x051f esr5mh6w e9989ue4 r7d6kgcz nhd2j8a9 p7hjln8o kvgmc6g5 cxmmr5t8 oygrvhab hcukyx3x i1ao9s8h esuyzwwr f1sip0of abiwlrkh p8dawk7l lzcic4wl bp9cbjyn s45kfl79 emlxlaya bkmhp75w spb7xbtv rt8b4zig n8ej3o3l agehan2d sk4xxmp2 rq0escxv j83agx80 taijpn5t jb3vyjys rz4wbd8a qt6c0cv9 a8nywdso l9j0dhe7 qypqp5cg q676j6op tdjehn4e'
+
 
 class FacebookScraper:
     FACEBOOK_TOP_URL = r'https://www.facebook.com/'
@@ -78,9 +81,47 @@ class FacebookScraper:
         self.login_to_facebook_top_page(my_email_or_number, my_password)
         # get_info_dict_of_reacted_people で帰る辞書のキー集合
         self.KEYS_OF_INFO_DICT = set()
+        # 人の URL から、名前を取得する辞書 リアクションした人の取得時に蓄積してく
+        self.get_full_name_by_top_page_url = {}
 
     def __del__(self):
         self.driver.quit()
+
+    def send_message_by_messenger_to(
+            self,
+            names: [str]           # メッセージを送る人のリスト
+    ) -> None:
+        '''
+        引数でもらった人の名前のリストに対してメッセージを送る
+        '''
+        self.driver.get('https://www.facebook.com/messages/new')
+        # 宛先に入れるのに失敗した名前 最後に表示する
+        names_of_failed = []
+        for name in names:
+            # 宛先名を入れるテキストボックスの要素
+            dear_input_elem = self.driver.find_element(by=By.CSS_SELECTOR, value='.'+'g5ia77u1 gcieejh5 bn081pho humdl8nn izx4hr6d rq0escxv oo9gr5id nc684nl6 jagab5yi knj5qynh fo6rh5oj aov4n071 oi9244e8 bi6gxh9e h676nmdw d2edcug0 lzcic4wl ieid39z1 osnr6wyh aj8hi1zk kd8v7px7 r4fl40cc m07ooulj mzan44vs'.replace(' ', '.'))
+            dear_input_elem.send_keys(name)
+            sleep(0.4)
+            # 宛先に入ってる文字列からサジェストされた人の要素
+            try:
+                suggest_elem = self.driver.find_element(by=By.CSS_SELECTOR, value='.'+"rq0escxv l9j0dhe7 du4w35lb j83agx80 cbu4d94t d2edcug0 hpfvmrgz rj1gh0hx buofh1pr g5gj957u p8fzw8mz pcp91wgn iuny7tx3 ipjc6fyt".replace(' ', '.'))
+            except:
+                # サジェストが無い場合
+                dear_input_elem.clear()
+                names_of_failed.append(name)
+            else:
+                suggest_elem.click()
+            sleep(0.4)
+        print('以下の名前の人たちを宛先に入れることに失敗しました。手動で入れてください')
+        # リアクションした人たちならこの辞書にURLと名前が紐づけてあるので、そのURLも表示しておく
+        name2url = {name: url for url, name in self.get_full_name_by_top_page_url.items()}
+        for name_of_failed in names_of_failed:
+            url_of_name = '不明'
+            if name_of_failed in name2url:  url_of_name = name2url[name_of_failed]
+            print(f'    {name_of_failed}  (URL : {url_of_name})')
+        input('\nメッセージの本文や添付を埋め、送信してください。\n送信後、もしくは送信せずにプログラムを終了する場合には、このままエンターキーを押してください。')
+        return
+
 
     def get_urls_of_reacted_people_per_posts(
             self,
@@ -236,6 +277,9 @@ class FacebookScraper:
         urls = [e.get_attribute('href') for e in link_elems]
         # 必要な部分以外のクエリパラメータを消す
         urls = [self.__get_abs_top_page_url(url) for url in urls]
+        # 後でいちいちurlに移動して名前を取得しないで済むようにここでセットしとく
+        for link_elem, abs_url in zip(link_elems, urls):
+            self.get_full_name_by_top_page_url[abs_url] = link_elem.text
         return urls
 
     def __load_page_display_reacted_people_until_get_urls(
@@ -404,7 +448,16 @@ class FacebookScraper:
         button_elem の中には人数をテキストに持つ要素が２つあるので、そのうち一つを指定して、そこから返す
         """
         elem_has_number = button_elem.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.HAS_NUMBER_IN_BUTTON_DISPLAY.replace(' ', '.'))
-        return int(elem_has_number.text.replace(',', ''))
+        try:
+            # 対象の投稿数が 10 の時は.textからしても何もエラーが起きなかったが、 20 にした時にエラーが起きるようになった どちらもinnerHTMLからするとエラーは静まったのでとりあえず
+            #ret = int(elem_has_number.text.replace(',', ''))
+            ret = int(elem_has_number.get_attribute('innerHTML').replace(',', ''))
+        except:
+            print('ERROR : in __get_number_of_reacted_people_from_button_elem')
+            print(f'button_elem.innerHTML = {button_elem.get_attribute("innerHTML")}')
+            print(f'elem_has_number.text = {elem_has_number.text}')
+            print(f'elem_has_number.innerHTML = {elem_has_number.get_attribute("innerHTML")}')
+        return ret
 
     @staticmethod
     def get_profile_page_url_from_top_page_url(top_page_url: str) -> str:
@@ -477,47 +530,40 @@ def stop(mess: str = 'STOP  (press enter to resume)'):
 
 
 
-def test_get_urls_of_reacted_people_per_posts(target_url, number_of_posts, email_or_number, password):
-    scraper = FacebookScraper(
-        email_or_number,
-        password,
-        False,
-    )
+def test_get_urls_of_reacted_people_per_posts(target_url, number_of_posts, scraper):
     # 各投稿にリアクションした人たちの URL を取得するテスト
-    urls_per_posts = scraper.get_urls_of_reacted_people_per_posts(r'https://www.facebook.com/minatoyasouken/', 20)
+    urls_per_posts = scraper.get_urls_of_reacted_people_per_posts(target_url, number_of_posts)
     for i, urls in enumerate(urls_per_posts, start=1):
-        #print(f'投稿 {i} について')
+        print(f'投稿 {i} について')
         for j, url in enumerate(urls, start=1):
-            url = scraper.get_profile_page_url_from_top_page_url(url)
-            #print(f'    url[{j} / {len(urls)}] = "{url}"')
-            print(url)
-            scraper.driver.get(url)
+            print(f'    name: {scraper.get_full_name_by_top_page_url[url]}   url: {url}')
         print()
     return
 
-def test_get_info_dict_by_top_page_url(url, email_or_number, password):
-    scraper = FacebookScraper(
-        email_or_number,
-        password,
-        False,
-    )
+def test_get_info_dict_by_top_page_url(url, scraper):
     # 個人のページで get_info_dict_by_top_page_url(url) をテスト
-    url = r'https://www.facebook.com/profile.php?id=100042763760254'
     info_dict = scraper.get_info_dict_by_top_page_url(url)
     with open('data_of_the_person.json', 'w') as f:
         json.dump(info_dict, f, indent=4, ensure_ascii=False)
 
-def test_get_info_dicts_of_reacted_people_per_posts(target_url, number_of_posts, email_or_number, password):
-    scraper = FacebookScraper(
-        email_or_number,
-        password,
-        False,
-    )
+def test_get_info_dicts_of_reacted_people_per_posts(target_url, number_of_posts, scraper):
     # 各投稿にリアクションした人たちの 情報 を取得するテスト
     info_dicts_of_reacted_people_per_posts = scraper.get_info_dicts_of_reacted_people_per_posts(target_url, number_of_posts)
     with open('info_dicts_of_reacted_people_per_posts.json', 'w') as f:
         json.dump(info_dicts_of_reacted_people_per_posts, f, indent=4, ensure_ascii=False)
     return 
+
+def test_send_message_by_messenger_to_reacted_people(target_url, number_of_posts, scraper):
+    # 各投稿にリアクション下人たちに、メッセージを送るテスト
+
+    # scraper.get_full_name_by_top_page_url を蓄積させるために呼び出す
+    scraper.get_urls_of_reacted_people_per_posts(target_url, number_of_posts)
+    names_of_reacted_people = list(scraper.get_full_name_by_top_page_url.values())
+    for i, name in enumerate(names_of_reacted_people):
+        print(f'    宛先 {i:3}  :  {name}')
+    print('以上の人たちを宛先に送るメッセージ画面を開きいています ...')
+    scraper.send_message_by_messenger_to(names_of_reacted_people)
+    return
 
 def write_info_dicts_on_xl(info_dicts_of_reacted_people_per_posts: {}, xl_file_path: str) -> None:
     # xl_file_path のエクセルファイルに、リアクションした人たちの情報を書き込む
@@ -574,6 +620,10 @@ def main():
         password,
         False,
     )
+
+    test_send_message_by_messenger_to_reacted_people(target_url, number_of_posts, scraper)
+
+    return
 
     # [{{}}] の形で帰る [{リアクションした人のURL : {情報の項目名(名前とか) : その人の情報}}] で各投稿ごとにリストで
     info_dicts_of_reacted_people_per_posts = scraper.get_info_dicts_of_reacted_people_per_posts(target_url, number_of_posts)
