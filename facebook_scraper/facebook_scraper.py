@@ -67,6 +67,8 @@ class ClassNames:
     # Messenger のボタン
     MESSENGER_BUTTON = 'oajrlxb2 qu0x051f esr5mh6w e9989ue4 r7d6kgcz nhd2j8a9 p7hjln8o kvgmc6g5 cxmmr5t8 oygrvhab hcukyx3x i1ao9s8h esuyzwwr f1sip0of abiwlrkh p8dawk7l lzcic4wl bp9cbjyn s45kfl79 emlxlaya bkmhp75w spb7xbtv rt8b4zig n8ej3o3l agehan2d sk4xxmp2 rq0escxv j83agx80 taijpn5t jb3vyjys rz4wbd8a qt6c0cv9 a8nywdso l9j0dhe7 qypqp5cg q676j6op tdjehn4e'
 
+    # 他の人のページでメッセージ画面を開いたときの、送信するテキストボックス
+    TEXTBOX_FOR_MESSAGE = 'oo9gr5id lzcic4wl l9j0dhe7 gsox5hk5 buofh1pr tw4czcav cehpxlet hpfvmrgz eg9m0zos notranslate'
 
 
 class FacebookScraper:
@@ -93,41 +95,34 @@ class FacebookScraper:
     def __del__(self):
         self.driver.quit()
 
-    def send_message_by_messenger_to(
+    def send_message(
             self,
-            names: [str]           # メッセージを送る人のリスト
+            url_of_target_person: str,  # 対象の人のトップページの URL
+            text_for_send: str,         # メッセージとして送る文字列
     ) -> None:
-        '''
-        引数でもらった人の名前のリストに対してメッセージを送る
-        '''
-        self.driver.get('https://www.facebook.com/messages/new')
-        # 宛先に入れるのに失敗した名前 最後に表示する
-        names_of_failed = []
-        for name in names:
-            # 宛先名を入れるテキストボックスの要素
-            dear_input_elem = self.driver.find_element(by=By.CSS_SELECTOR, value='.'+'g5ia77u1 gcieejh5 bn081pho humdl8nn izx4hr6d rq0escxv oo9gr5id nc684nl6 jagab5yi knj5qynh fo6rh5oj aov4n071 oi9244e8 bi6gxh9e h676nmdw d2edcug0 lzcic4wl ieid39z1 osnr6wyh aj8hi1zk kd8v7px7 r4fl40cc m07ooulj mzan44vs'.replace(' ', '.'))
-            dear_input_elem.send_keys(name)
-            sleep(0.4)
-            # 宛先に入ってる文字列からサジェストされた人の要素
-            try:
-                suggest_elem = self.driver.find_element(by=By.CSS_SELECTOR, value='.'+"rq0escxv l9j0dhe7 du4w35lb j83agx80 cbu4d94t d2edcug0 hpfvmrgz rj1gh0hx buofh1pr g5gj957u p8fzw8mz pcp91wgn iuny7tx3 ipjc6fyt".replace(' ', '.'))
-            except:
-                # サジェストが無い場合
-                dear_input_elem.clear()
-                names_of_failed.append(name)
-            else:
-                suggest_elem.click()
-            sleep(0.4)
-        print('以下の名前の人たちを宛先に入れることに失敗しました。手動で入れてください')
-        # リアクションした人たちならこの辞書にURLと名前が紐づけてあるので、そのURLも表示しておく
-        name2url = {name: url for url, name in self.url2fullname.items()}
-        for name_of_failed in names_of_failed:
-            url_of_name = '不明'
-            if name_of_failed in name2url:  url_of_name = name2url[name_of_failed]
-            print(f'    {name_of_failed}  (URL : {url_of_name})')
-        input('\nメッセージの本文や添付を埋め、送信してください。\n送信後、もしくは送信せずにプログラムを終了する場合には、このままエンターキーを押してください。')
-        return
-
+        # 対象の人のトップページに移動
+        self.driver.get(url_of_target_person)
+        sleep(0.5)
+        # メッセージ画面を開くボタンを押す（要素が存在しない場合は友達のみに制限してる）
+        try:  open_elem = self.driver.find_element(by=By.XPATH, value=f"//div[@role='button'][@aria-label='メッセージ']")
+        except:
+            print('このユーザーはメッセージを送れる人を「友達のみ」に制限しているのでスキップします。')
+            return
+        self.driver.execute_script("arguments[0].click();", open_elem)
+        sleep(0.4)
+        # テキストを入力
+        text_elem = self.driver.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.TEXTBOX_FOR_MESSAGE.replace(' ', '.'))
+        text_elem.send_keys(text_for_send)
+        sleep(0.3)
+        # 送信ボタンを押す（メッセージ文が空の場合はボタンが出てないので、一応確認してから）
+        if text_elem.text != '':
+            send_elem = self.driver.find_element(by=By.XPATH, value=f"//div[@role='button'][@aria-label='Enterを押して送信']")
+            self.driver.execute_script("arguments[0].click();", send_elem)
+            sleep(0.3)
+        # メッセージ画面を閉じるボタンを押す（押さないとほかのページにいっても残ることがある）
+        close_elem = self.driver.find_element(by=By.XPATH, value=f"//div[@role='button'][@aria-label='チャットを閉じる']")
+        self.driver.execute_script("arguments[0].click();", close_elem)
+        sleep(0.3)
 
     def get_urls_of_reacted_people(
             self,
@@ -338,7 +333,7 @@ class FacebookScraper:
                 try:  ActionChains(self.driver).drag_and_drop_by_offset(var_elem, 0, dh_mid).perform()
                 except Exception as e:  dh_no = dh_mid
                 else:    dh_ok = dh_mid
-            sleep(0.6)
+            sleep(0.3)
 	    # 今読み込めてるリアクションした人のページのURLリストを取得し、その数を更新
             cur_count_reacted_people = len(self.__get_top_page_urls_of_reacted_people_on_displayed_page())
             if cur_count_reacted_people > prv_count_reacted_people:
@@ -414,20 +409,6 @@ class FacebookScraper:
                 # ボタン要素を保存
                 self.button_elems.append(post_elem.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.BUTTON_DISPLAY_REACTED_PEOPLE.replace(' ', '.')))
 
-    def siori_test(self):
-        self.__set_post_and_button_elems('https://www.facebook.com/minatoyasouken', 10)
-        for i, button in enumerate(self.button_elems):
-            print(f'{i} button')
-            self.driver.execute_script("arguments[0].click();", button)
-            link_list = self.driver.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.GROUP_OF_DISPLAY_LIST.replace(' ', '.'))
-
-            print('        ', link_list.text.replace('\n', ' '))
-
-            r = 'oajrlxb2 qu0x051f esr5mh6w e9989ue4 r7d6kgcz nhd2j8a9 p7hjln8o kvgmc6g5 cxmmr5t8 oygrvhab hcukyx3x i1ao9s8h esuyzwwr f1sip0of abiwlrkh p8dawk7l lzcic4wl bp9cbjyn s45kfl79 emlxlaya bkmhp75w spb7xbtv rt8b4zig n8ej3o3l agehan2d sk4xxmp2 rq0escxv j83agx80 taijpn5t jb3vyjys rz4wbd8a qt6c0cv9 a8nywdso l9j0dhe7 tv7at329 thwo4zme tdjehn4e'
-            close_button = self.driver.find_element(by=By.CSS_SELECTOR, value='.'+r.replace(' ', '.'))
-            self.driver.execute_script("arguments[0].click();", close_button)
-            print('    close button pushed')
-
 
     def __get_post_elems_by_url(
             self, 
@@ -438,7 +419,8 @@ class FacebookScraper:
         調査対象の投稿を読み込んでいき、与えられた数だけ投稿要素を返す関数
         '''
         print('対象のページにアクセスしています ... ')
-        self.driver.get(target_top_page_url)
+        if not target_top_page_url == self.driver.current_url:
+            self.driver.get(target_top_page_url)
         self.__print_done_message_with_sleep(2)
 
         print(f'投稿を読み込んでいます ... （取得する投稿の数 : {number_of_target_posts}）')
@@ -509,12 +491,6 @@ class FacebookScraper:
 
 
     # ここから下は、ヘルパー関数のような役割のもの
-
-    def save_current_page_source(self, path_for_save: str):
-	#  分析用に現時点でのソースを保存する
-        with open(path_for_save, mode='w') as f:
-            f.write(self.driver.page_source)
-        print(f'ソースコードをセーブしました  保存場所 : {path_for_save}')
 
     def __get_number_of_reacted_people_from_button_elem(self, button_elem) -> int:
         """
@@ -587,6 +563,12 @@ class FacebookScraper:
         if abs_top_page_url[-1] == '/':  abs_top_page_url = abs_top_page_url[:-1]
         return abs_top_page_url    
 
+    def save_current_page_source(self, path_for_save: str):
+	#  分析用に現時点でのソースを保存する
+        with open(path_for_save, mode='w') as f:
+            f.write(self.driver.page_source)
+        print(f'ソースコードをセーブしました  保存場所 : {path_for_save}')
+
     @staticmethod
     def __print_done_message_with_sleep(time_seconds=3):
         print('完了しました\n')
@@ -605,29 +587,34 @@ def stop(mess: str = 'STOP  (press enter to resume)'):
 
 
 def main():
-    if len(sys.argv) < 5:
+    if len(sys.argv) < 4:
         print('引数が足りません。以下の値を実行時に引数として入力してください。')
         print('[1] : ログインに使うメールアドレスまたは電話番号')
         print('[2] : ログインに使うパスワード')
         print('[3] : 対象とする投稿の数')
         print('[4] : 対象とする FaceBook のページ')
-        print('[5] : 結果を保存するファイルのパス')
+        #print('[5] : 結果を保存するファイルのパス')
         return
     email_or_number  = sys.argv[1]       # ログインに使うメールアドレスまたは電話番号
     password         = sys.argv[2]       # ログインに使うパスワード
     number_of_posts  = int(sys.argv[3])  # 対象とする投稿の数
     target_url       = sys.argv[4]       # 対象とする FaceBook のページ
-    answer_file_path = sys.argv[5]       # 結果を保存するファイルのパス
+    #answer_file_path = sys.argv[5]       # 結果を保存するファイルのパス
 
     scraper = FacebookScraper(
         email_or_number,
         password,
         False,
     )
+    '''
+    scraper.send_message('https://www.facebook.com/profile.php?id=100072364878443')
+    return
+    '''
 
-    urls = scraper.get_urls_of_reacted_people(target_url, number_of_posts - 1, True)
+    urls = scraper.get_urls_of_reacted_people(target_url, number_of_posts - 1)
     for i, url in enumerate(urls):
         print(f'urls[{i}] = {url}')
+        scraper.send_message(url, 'Nice to meet you!')
     return
     
 
@@ -672,18 +659,6 @@ def test_get_info_dicts_of_reacted_people_per_posts(target_url, number_of_posts,
     with open('info_dicts_of_reacted_people_per_posts.json', 'w') as f:
         json.dump(info_dicts_of_reacted_people_per_posts, f, indent=4, ensure_ascii=False)
     return 
-
-def test_send_message_by_messenger_to_reacted_people(target_url, number_of_posts, scraper):
-    # 各投稿にリアクション下人たちに、メッセージを送るテスト
-
-    # scraper.url2fullname を蓄積させるために呼び出す
-    scraper.get_urls_of_reacted_people_per_posts(target_url, number_of_posts)
-    names_of_reacted_people = list(scraper.url2fullname.values())
-    for i, name in enumerate(names_of_reacted_people):
-        print(f'    宛先 {i:3}  :  {name}')
-    print('以上の人たちを宛先に送るメッセージ画面を開きいています ...')
-    scraper.send_message_by_messenger_to(names_of_reacted_people)
-    return
 
 def write_info_dicts_on_xl(info_dicts_of_reacted_people_per_posts: {}, xl_file_path: str) -> None:
     # xl_file_path のエクセルファイルに、リアクションした人たちの情報を書き込む
