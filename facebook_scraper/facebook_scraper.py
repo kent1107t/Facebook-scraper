@@ -606,19 +606,6 @@ def main():
         password,
         False,
     )
-    '''
-    scraper.send_message('https://www.facebook.com/profile.php?id=100072364878443')
-    return
-    '''
-
-    urls = scraper.get_urls_of_reacted_people(target_url, number_of_posts - 1)
-    for i, url in enumerate(urls):
-        print(f'urls[{i}] = {url}')
-        scraper.send_message(url, 'Nice to meet you!')
-    return
-    
-
-    test_send_message_by_messenger_to_reacted_people(target_url, number_of_posts, scraper)
 
     return
 
