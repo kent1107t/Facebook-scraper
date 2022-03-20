@@ -26,6 +26,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 
+
 class ClassNames:
     # 取得したいクラス名をまとめたクラス 
     # 空白区切りでクラス名を指定してる要素（複数のクラス指定）は、クラス名からではなくcss-selectorから、値の指定は .name1.name2.name3...nameX の形式でする
@@ -37,6 +38,10 @@ class ClassNames:
     BUTTON_DISPLAY_REACTED_PEOPLE = 'oajrlxb2 g5ia77u1 qu0x051f esr5mh6w e9989ue4 r7d6kgcz rq0escxv nhd2j8a9 p7hjln8o kvgmc6g5 cxmmr5t8 oygrvhab hcukyx3x jb3vyjys rz4wbd8a qt6c0cv9 a8nywdso i1ao9s8h esuyzwwr f1sip0of n00je7tq arfg74bv qs9ysxi8 k77z8yql l9j0dhe7 abiwlrkh p8dawk7l lzcic4wl gmql0nx0 ce9h75a5 ni8dbmo4 stjgntxs a8c37x1j'
     # リアクションした人たちを表示するボタン要素の中の、人数の値が入ってる要素のクラス名
     HAS_NUMBER_IN_BUTTON_DISPLAY = 'gpro0wi8 pcp91wgn'
+
+    # 一覧表示ページ
+    # 一覧の表示を閉じるボタン
+    CLOSE_BUTTON_ON_DISPLAYED_PAGE = 'oajrlxb2 qu0x051f esr5mh6w e9989ue4 r7d6kgcz nhd2j8a9 p7hjln8o kvgmc6g5 cxmmr5t8 oygrvhab hcukyx3x i1ao9s8h esuyzwwr f1sip0of abiwlrkh p8dawk7l lzcic4wl bp9cbjyn s45kfl79 emlxlaya bkmhp75w spb7xbtv rt8b4zig n8ej3o3l agehan2d sk4xxmp2 rq0escxv j83agx80 taijpn5t jb3vyjys rz4wbd8a qt6c0cv9 a8nywdso l9j0dhe7 tv7at329 thwo4zme tdjehn4e'
     # 一覧表示ページの、スクロールバーの役割をしてる要素のクラス名
     SCROLL_VAR_ON_DISPLAYED_PAGE = 'oj68ptkr jk6sbkaj kdgqqoy6 ihh4hy1g qttc61fc datstx6m k4urcfbm'
     # リアクションした人たちのリストが入ってる、最小の共通要素のとこのクラス名
@@ -63,6 +68,7 @@ class ClassNames:
     MESSENGER_BUTTON = 'oajrlxb2 qu0x051f esr5mh6w e9989ue4 r7d6kgcz nhd2j8a9 p7hjln8o kvgmc6g5 cxmmr5t8 oygrvhab hcukyx3x i1ao9s8h esuyzwwr f1sip0of abiwlrkh p8dawk7l lzcic4wl bp9cbjyn s45kfl79 emlxlaya bkmhp75w spb7xbtv rt8b4zig n8ej3o3l agehan2d sk4xxmp2 rq0escxv j83agx80 taijpn5t jb3vyjys rz4wbd8a qt6c0cv9 a8nywdso l9j0dhe7 qypqp5cg q676j6op tdjehn4e'
 
 
+
 class FacebookScraper:
     FACEBOOK_TOP_URL = r'https://www.facebook.com/'
     classnames = ClassNames()
@@ -77,12 +83,12 @@ class FacebookScraper:
 
         self.options = self.__get_options()
         self.driver = self.__get_driver()
-        # ここでログインするようにしてるけど、たぶん後で変える
+        # リアクションした人たちを見るにはログインが必要
         self.login_to_facebook_top_page(my_email_or_number, my_password)
         # get_info_dict_of_reacted_people で帰る辞書のキー集合
         self.KEYS_OF_INFO_DICT = set()
         # 人の URL から、名前を取得する辞書 リアクションした人の取得時に蓄積してく
-        self.get_full_name_by_top_page_url = {}
+        self.url2fullname = {}
 
     def __del__(self):
         self.driver.quit()
@@ -114,7 +120,7 @@ class FacebookScraper:
             sleep(0.4)
         print('以下の名前の人たちを宛先に入れることに失敗しました。手動で入れてください')
         # リアクションした人たちならこの辞書にURLと名前が紐づけてあるので、そのURLも表示しておく
-        name2url = {name: url for url, name in self.get_full_name_by_top_page_url.items()}
+        name2url = {name: url for url, name in self.url2fullname.items()}
         for name_of_failed in names_of_failed:
             url_of_name = '不明'
             if name_of_failed in name2url:  url_of_name = name2url[name_of_failed]
@@ -123,52 +129,85 @@ class FacebookScraper:
         return
 
 
+    def get_urls_of_reacted_people(
+            self,
+            target_top_page_url: str,       # 対象とする人のページ
+            index_of_post: int,             # 対象とする投稿の、一番新しい投稿から見たときの番号 (0-indexed)
+            need_confirm: bool = False,     # 投稿の文字を表示して、対象の投稿かを確認する
+    ) -> [str]:
+        while True:
+            # 投稿とボタンの要素を必要な分取得
+            self.__set_post_and_button_elems(target_top_page_url, index_of_post + 1)
+            # 確認する必要がなければそのまま出る
+            if not need_confirm:  break
+            # 入力し直す必要があるか確認し、必要がなければそのまま出る
+            print('-'*55, *list(map(lambda s: '    '+s, self.post_elems[index_of_post].text.split('\n')[:5])), '-'*55, sep='\n')
+            need_redo = ('y' != input('対象とする投稿は以上のものでよろしいでしょうか？\nよろしい場合は "y" を入力しエンターキーを押してください  :  '))
+            if not need_redo:  break
+            # 新しい投稿の番号を入力
+            while True:
+                index_of_post = input('    一番新しい投稿から数えたとき、対象とする投稿が何番目かを入力してエンターキーを押してください。  :  ')
+                if not index_of_post.isdecimal() or int(index_of_post) <= 0:
+                    print('        正の数字を入力してください。')
+                    continue
+                index_of_post = int(index_of_post) - 1
+                break
+        # リアクションした人たちを表示するボタンを持っていない --> リアクションした人の数が 0 なので空のリストを返す
+        if not index_of_post in self.post_index2button_index:  return []
+        # 人の一覧を表示するボタン要素から、その一覧の人たちのトップページの URL を取得する
+        urls = self.__get_urls_of_reacted_people_from_button_elem(self.button_elems[self.post_index2button_index[index_of_post]])
+        self.__print_done_message_with_sleep(0.1)
+        return urls
+
     def get_urls_of_reacted_people_per_posts(
             self,
-            TARGET_TOP_PAGE_URL: str,       # 対象とする人のページ
-            NUMBER_OF_TARGETED_POSTS: int,  # 対象とする投稿の数
-    ) -> [[]]:
+            target_top_page_url: str,       # 対象とする人のページ
+            number_of_target_posts: int,  # 対象とする投稿の数
+    ) -> [[str]]:
         '''
         各投稿について、リアクションした人の URL を返す関数
         '''
-        # 与えられた数だけ、対象の人のページから投稿の要素を取得する
-        post_elems = self.__get_post_elems_by_url(TARGET_TOP_PAGE_URL, NUMBER_OF_TARGETED_POSTS)
+        # 投稿とボタンの要素を必要な分取得
+        self.__set_post_and_button_elems(target_top_page_url, number_of_target_posts)
         # 各投稿要素について、ボタン要素を取得し（存在すれば リアクションした人数が0なら存在しない）、ボタン要素からリアクションした人たちの URL を取得する
-        urls_per_posts = [[] for _ in range(NUMBER_OF_TARGETED_POSTS)]  # 投稿の数 x リアクションした人の数 の二次元リスト
+        urls_per_posts = [[] for _ in range(number_of_target_posts)]  # 投稿の数 x リアクションした人の数 の二次元リスト
         print('各投稿について、リアクションした人達の FACEBOOK ページの URL を取得しています ... ')
-        current_button_index = 0  # 今が全体で何個目のボタン要素か リアクションした人の数が 0 なら無いので、投稿のインデックスと一致しない
-        for i, post_elem in enumerate(post_elems):
+        for i, post_elem in enumerate(self.post_elems):
             print(f'    投稿 {i+1:3} / {len(post_elems):3} について')
             urls_per_posts[i] = []
             # リアクションした人の数が 0 なら、ボタン要素も無いのでスキップ
-            if post_elem.get_attribute("innerHTML").count(self.classnames.BUTTON_DISPLAY_REACTED_PEOPLE) == 0:
+            if not self.__does_post_have_button_display_reacted_people(post_elem):
                 print('        リアクションした人の数は 0 です')
                 continue
-            button_elem = post_elem.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.BUTTON_DISPLAY_REACTED_PEOPLE.replace(' ', '.'))
+            button_elem = self.button_elems[self.post_index2button_index[i]]
             # 人の一覧を表示するボタン要素から、その一覧の人たちのトップページの URL を取得する
             urls_per_posts[i] = self.__get_urls_of_reacted_people_from_button_elem_display(button_elem, current_button_index)
             current_button_index += 1
         self.__print_done_message_with_sleep(0.1)
         return urls_per_posts
 
+    def __does_post_have_button_display_reacted_people(self, post_elem):
+        # もらった投稿の要素 post_elem の中にリアクションした人を表示するボタン要素があるかどうかを返す
+        return  post_elem.get_attribute("innerHTML").count(self.classnames.BUTTON_DISPLAY_REACTED_PEOPLE) > 0
+
     def get_info_dicts_of_reacted_people_per_posts(
             self,
-            TARGET_TOP_PAGE_URL: str,       # 対象とする人のページ
-            NUMBER_OF_TARGETED_POSTS: int,  # 対象とする投稿の数
+            target_top_page_url: str,       # 対象とする人のページ
+            number_of_target_posts: int,  # 対象とする投稿の数
     ) -> [{}]:
         '''
         引数の人の投稿にリアクションした人の情報の dict を、各投稿の分だけリストにして返す
-        len(返り値)         -->   対象とする投稿の数 (NUMBER_OF_TARGETED_POSTS)
+        len(返り値)         -->   対象とする投稿の数 (number_of_target_posts)
         返り値[i].keys()    -->   i 番目投稿にリアクションした人たちの URL の集合
         返り値[i].values()  -->   i 番目投稿にリアクションした人たちの情報(dict)の集合
         '''
         # 対象の投稿数までのすべての投稿について、リアクションした人たちの URL を取得
-        urls_of_reacted_people_per_posts = self.get_urls_of_reacted_people_per_posts(TARGET_TOP_PAGE_URL, NUMBER_OF_TARGETED_POSTS)
+        urls_of_reacted_people_per_posts = self.get_urls_of_reacted_people_per_posts(target_top_page_url, number_of_target_posts)
         #print('TOUR in top page urls of reacted people')
         print('リアクションした人たちのページから情報を取得します ... ')
-        info_dicts_per_posts = [{} for _ in range(NUMBER_OF_TARGETED_POSTS)]  # 投稿の数だけ、URL をキーとしたその人の情報の辞書を返す
+        info_dicts_per_posts = [{} for _ in range(number_of_target_posts)]  # 投稿の数だけ、URL をキーとしたその人の情報の辞書を返す
         for i, top_page_urls in enumerate(urls_of_reacted_people_per_posts):
-            print(f'    投稿 {i+1:3} / {NUMBER_OF_TARGETED_POSTS:3} について')
+            print(f'    投稿 {i+1:3} / {number_of_target_posts:3} について')
             for j, top_page_url in enumerate(top_page_urls):
                 print(f'        URL {j+1:3} / {len(top_page_urls):3}  {top_page_url}')
                 info_dicts_per_posts[i][top_page_url] = self.get_info_dict_by_top_page_url(top_page_url)
@@ -261,31 +300,25 @@ class FacebookScraper:
         return unknown_keyname
     
 
-    def __get_top_page_urls_of_reacted_people_on_displayed_page(
-            self,
-            CURRENT_BUTTON_INDEX: int,  # 0-indexed 現在の押されている一覧表示用ボタンのインデックス ソースにはボタンを押した時その一覧のリンクが蓄積されていくみたいで、その指定のために もしかしたら[-1]で最後を毎回指定するかも あと怖いのは、蓄積されるだけじゃなくて、後の方の一覧を読んでいくと先頭の一覧から消えていくんじゃないかどうかが
-    ) -> [str]:
+    def __get_top_page_urls_of_reacted_people_on_displayed_page(self) -> [str]:
+        '''
+        リアクションした人たちの一覧が載ってるページにいる前提で、それぞれの人のトップページの URL を取得してリストで返す
+        '''
         # 人の一覧が載ってるとこの共通クラスを取得
-        group_elems_display_list = self.driver.find_elements(by=By.CSS_SELECTOR, value='.'+self.classnames.GROUP_OF_DISPLAY_LIST.replace(' ', '.'))
-        # まだそもそも今回の一覧のグループクラスを読み込めてない時
-        if not (CURRENT_BUTTON_INDEX < len(group_elems_display_list)):
-            #print('まだそもそも今回の一覧のグループクラスを読み込めてない時')
-            return list()
+        group_elem_display_list = self.driver.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.GROUP_OF_DISPLAY_LIST.replace(' ', '.'))
         # リアクションした人たちのリンクが入ってるグループの要素の中から、リンクの要素を取得する
-        link_elems = group_elems_display_list[-1].find_elements(by=By.CSS_SELECTOR, value='.'+self.classnames.LINK_TO_REACTED_PERSON.replace(' ', '.'))
+        link_elems = group_elem_display_list.find_elements(by=By.CSS_SELECTOR, value='.'+self.classnames.LINK_TO_REACTED_PERSON.replace(' ', '.'))
         # リンクの要素から href の値をげっと
         urls = [e.get_attribute('href') for e in link_elems]
         # 必要な部分以外のクエリパラメータを消す
         urls = [self.__get_abs_top_page_url(url) for url in urls]
         # 後でいちいちurlに移動して名前を取得しないで済むようにここでセットしとく
-        for link_elem, abs_url in zip(link_elems, urls):
-            self.get_full_name_by_top_page_url[abs_url] = link_elem.text
+        for link_elem, abs_url in zip(link_elems, urls):  self.url2fullname[abs_url] = link_elem.text
         return urls
 
     def __load_page_display_reacted_people_until_get_urls(
             self, 
-            NUMBER_OF_REACTED_PEOPLE: int,  # 一覧に表示されるべき人の数
-            CURRENT_BUTTON_INDEX: int,  # 0-indexed 現在の押されている一覧表示用ボタンのインデックス ソースにはボタンを押した時その一覧のリンクが蓄積されていくみたいで、その指定のために もしかしたら[-1]で最後を毎回指定するかも あと怖いのは、蓄積されるだけじゃなくて、後の方の一覧を読んでいくと先頭の一覧から消えていくんじゃないかどうかが
+            number_of_reacted_people: int,  # 一覧に表示されるべき人の数
     ) -> None:
         '''
         ちゃんんともらった値の数だけ一覧が表示されるまで、ページを読み込んでいく関数
@@ -294,38 +327,37 @@ class FacebookScraper:
         var_elem = self.driver.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.SCROLL_VAR_ON_DISPLAYED_PAGE.replace(' ', '.'))
         prv_count_reacted_people, cur_count_reacted_people = -1, 0
         stagnation_count = 0  # 何回停滞が続いてるかを持つ変数
-        sum_dy_of_scroll = 0  # スクロールバーの y 座標が累計で最初と比べてどのくらい下に降りてるか
 
         for scroll_count in range(10000):
             # ここの値は読み込むごとにバーの大きさが小さくなっていって、下まで行ける値が大きくなっていくぽいから、毎回煮豚んでしてる
             dh_ok, dh_no = 0, 800
             while dh_ok + 3 < dh_no:
+                sleep(0.3)
                 dh_mid = (dh_ok + dh_no) // 2
                 #print(f'ok : {dh_ok}   mid : {dh_mid}   no : {dh_no}')
-                try:
-                    ActionChains(self.driver).drag_and_drop_by_offset(var_elem, 0, dh_mid).perform()
+                try:  ActionChains(self.driver).drag_and_drop_by_offset(var_elem, 0, dh_mid).perform()
                 except Exception as e:  dh_no = dh_mid
                 else:    dh_ok = dh_mid
-
+            sleep(0.6)
 	    # 今読み込めてるリアクションした人のページのURLリストを取得し、その数を更新
-            cur_count_reacted_people = len(self.__get_top_page_urls_of_reacted_people_on_displayed_page(CURRENT_BUTTON_INDEX))
+            cur_count_reacted_people = len(self.__get_top_page_urls_of_reacted_people_on_displayed_page())
             if cur_count_reacted_people > prv_count_reacted_people:
-                print(f'         （読み込み中） 現在取得されている人数 : {cur_count_reacted_people} / {NUMBER_OF_REACTED_PEOPLE}')
+                print(f'         （読み込み中） 現在取得されている人数 : {cur_count_reacted_people} / {number_of_reacted_people}')
                 prv_count_reacted_people = cur_count_reacted_people
                 stagnation_count = 0
             else:
                 stagnation_count += 1
             # ソースコードから取得した人数とイコールになれば終了 
-            if cur_count_reacted_people == NUMBER_OF_REACTED_PEOPLE:  break
+            if cur_count_reacted_people == number_of_reacted_people:  break
             # 停滞がある程度続いてたら終了
-            if stagnation_count > 10:
+            if stagnation_count > 60:
                 print(f'        停滞してるので終了します。')
                 break
             '''
             # low_limit <= dy <= up_limit の範囲で、残りの読み込めてない要素数に応じて、下にスクロール
             low_limit, up_limit = 5, 50
             # 今回新しくスクロールする分
-            dy_of_scroll_this_time = low_limit + (up_limit - low_limit) * ((NUMBER_OF_REACTED_PEOPLE - cur_count_reacted_people) / NUMBER_OF_REACTED_PEOPLE)
+            dy_of_scroll_this_time = low_limit + (up_limit - low_limit) * ((number_of_reacted_people - cur_count_reacted_people) / number_of_reacted_people)
             sum_dy_of_scroll += dy_of_scroll_this_time
             print(f'dy_of_scroll_down_this_time = {dy_of_scroll_this_time}   sum_dy_of_scroll = {sum_dy_of_scroll}')
             try:
@@ -335,63 +367,106 @@ class FacebookScraper:
                 print('error in ActionChains.drag_and_drop_by_offset')
             sleep(0.35)
             '''
-        return
 
-    def __get_urls_of_reacted_people_from_button_elem_display(
+    def __get_urls_of_reacted_people_from_button_elem(
             self,
-            button_elem_display_reacted_people,  # クリックするとリアクションした人の一覧が表示されるボタン要素
-            CURRENT_BUTTON_INDEX: int,  # 0-indexed 現在の押されている一覧表示用ボタンのインデックス ソースにはボタンを押した時その一覧のリンクが蓄積されていくみたいで、その指定のために もしかしたら[-1]で最後を毎回指定するかも あと怖いのは、蓄積されるだけじゃなくて、後の方の一覧を読んでいくと先頭の一覧から消えていくんじゃないかどうかが
+            display_button,  # クリックするとリアクションした人の一覧が表示されるボタン要素
     ) -> [str]:
         '''
         引数でもらった一覧を表示するボタンを押して、表示された人たちの URL をリストで返す関数
         '''
+        urls = []
         # 今見てるボタン要素の部分のソースから、この投稿にリアクションした人の人数を取得
-        NUMBER_OF_REACTED_PEOPLE = self.__get_number_of_reacted_people_from_button_elem(button_elem_display_reacted_people)
+        number_of_reacted_people = self.__get_number_of_reacted_people_from_button_elem(display_button)
         # ボタンをクリックして一覧を表示
-        self.driver.execute_script("arguments[0].click();", button_elem_display_reacted_people)
+        self.driver.execute_script("arguments[0].click();", display_button)
+
         sleep(1)
         # すべての人がちゃんと読み込めるまで、スクロールとかをする
-        self.__load_page_display_reacted_people_until_get_urls(NUMBER_OF_REACTED_PEOPLE, CURRENT_BUTTON_INDEX)
+        self.__load_page_display_reacted_people_until_get_urls(number_of_reacted_people)
+        urls = self.__get_top_page_urls_of_reacted_people_on_displayed_page()
+
+        # 人たちのリンクのグループを一つにしておくために（開きっぱだと残ってしまう）今回のをちゃんと閉じとく
+        close_button = self.driver.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.CLOSE_BUTTON_ON_DISPLAYED_PAGE.replace(' ', '.'))
+        self.driver.execute_script("arguments[0].click();", close_button)
         # 読み込んだ段階で、一覧で表示されてる人たちの URL を取得し返す
-        return self.__get_top_page_urls_of_reacted_people_on_displayed_page(CURRENT_BUTTON_INDEX)
+        return urls
+
+    def __set_post_and_button_elems(
+            self,
+            target_top_page_url: str,       # 対象とする人の投稿の載ってるトップページ
+            number_of_target_posts: int,    # 対象とする投稿の数
+    ) -> None:
+        '''
+        調査対象の投稿を読み込んでいき、投稿の要素とボタンの要素と各ボタンのインデックス（リアクションした人たちのリンクが載ってるグループが今を確認するために）をセットする
+        '''
+        # セットするための各要素
+        self.post_elems   = []
+        self.button_elems = []
+        self.post_index2button_index = {}
+        # まず投稿の要素を取得
+        self.post_elems = self.__get_post_elems_by_url(target_top_page_url, number_of_target_posts)
+        # ボタン要素と、何番目の投稿が何番目のボタンに対応してるかの辞書を取得
+        for i, post_elem in enumerate(self.post_elems):
+            if self.__does_post_have_button_display_reacted_people(post_elem):
+                # インデックスの変換を記録
+                self.post_index2button_index[i] = len(self.button_elems)
+                # ボタン要素を保存
+                self.button_elems.append(post_elem.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.BUTTON_DISPLAY_REACTED_PEOPLE.replace(' ', '.')))
+
+    def siori_test(self):
+        self.__set_post_and_button_elems('https://www.facebook.com/minatoyasouken', 10)
+        for i, button in enumerate(self.button_elems):
+            print(f'{i} button')
+            self.driver.execute_script("arguments[0].click();", button)
+            link_list = self.driver.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.GROUP_OF_DISPLAY_LIST.replace(' ', '.'))
+
+            print('        ', link_list.text.replace('\n', ' '))
+
+            r = 'oajrlxb2 qu0x051f esr5mh6w e9989ue4 r7d6kgcz nhd2j8a9 p7hjln8o kvgmc6g5 cxmmr5t8 oygrvhab hcukyx3x i1ao9s8h esuyzwwr f1sip0of abiwlrkh p8dawk7l lzcic4wl bp9cbjyn s45kfl79 emlxlaya bkmhp75w spb7xbtv rt8b4zig n8ej3o3l agehan2d sk4xxmp2 rq0escxv j83agx80 taijpn5t jb3vyjys rz4wbd8a qt6c0cv9 a8nywdso l9j0dhe7 tv7at329 thwo4zme tdjehn4e'
+            close_button = self.driver.find_element(by=By.CSS_SELECTOR, value='.'+r.replace(' ', '.'))
+            self.driver.execute_script("arguments[0].click();", close_button)
+            print('    close button pushed')
+
 
     def __get_post_elems_by_url(
             self, 
-            TARGET_TOP_PAGE_URL: str,       # 対象とする人の投稿の載ってるトップページ
-            NUMBER_OF_TARGETED_POSTS: int,  # 対象とする投稿の数
+            target_top_page_url: str,       # 対象とする人の投稿の載ってるトップページ
+            number_of_target_posts: int,    # 対象とする投稿の数
     ) -> []:
         '''
         調査対象の投稿を読み込んでいき、与えられた数だけ投稿要素を返す関数
         '''
-        # TODO: 欲しい投稿数がそもそもユーザーの投稿数より少ない場合を考えてない 無限ループする
         print('対象のページにアクセスしています ... ')
-        self.driver.get(TARGET_TOP_PAGE_URL)
+        self.driver.get(target_top_page_url)
         self.__print_done_message_with_sleep(2)
 
-        print(f'投稿を読み込んでいます ... （取得する投稿の数 : {NUMBER_OF_TARGETED_POSTS}）')
-        # 返り値
-        post_elems = []
+        print(f'投稿を読み込んでいます ... （取得する投稿の数 : {number_of_target_posts}）')
+        post_elems = []  # 返り値
         # 欲しい投稿数分が取得されるまで、下にスクロールしてページを読み込む
-        prv_posts_count, cur_posts_count = -1, 0
+        prv_posts_count, cur_posts_count, stagnation_count = -1, 0, 0
         page = self.driver.find_element(by=By.TAG_NAME, value='html')
-        while True:
+        while stagnation_count < 60:
             # 今のすべての投稿の要素を取得
             post_elems = self.driver.find_elements(by=By.CSS_SELECTOR, value='.'+self.classnames.POSTS.replace(' ', '.'))
             cur_posts_count = len(post_elems)
             if cur_posts_count > prv_posts_count:
-                print(f'    （読み込み中） 現在取得されている投稿数 : {cur_posts_count} / {NUMBER_OF_TARGETED_POSTS}')
+                print(f'    （読み込み中） 現在取得されている投稿数 : {cur_posts_count} / {number_of_target_posts}')
                 prv_posts_count = cur_posts_count
+                stagnation_count = 0
+            else:
+                stagnation_count += 1
             # 与えられた必要数を上回ってれば読み込み終了
-            if cur_posts_count >= NUMBER_OF_TARGETED_POSTS:  break
+            if cur_posts_count >= number_of_target_posts:  break
 
             # 下に読み込みを続けるだけだと、遅い時に余計遅い感じがするから、一旦上にも上げるようにしてる
             page.send_keys(Keys.PAGE_UP)
             sleep(0.4)
             for _ in range(20):  page.send_keys(Keys.PAGE_DOWN)
-            sleep(max(1, min(2, NUMBER_OF_TARGETED_POSTS - cur_posts_count)))  # 下限と上限を決めてその間でsleep
+            sleep(max(1, min(2, number_of_target_posts - cur_posts_count)))  # 下限と上限を決めてその間でsleep
         self.__print_done_message_with_sleep(1)
         # 必要数ですりきって返す
-        return post_elems[:NUMBER_OF_TARGETED_POSTS]
+        return post_elems[:number_of_target_posts]
         
     def login_to_facebook_top_page(self, my_email_or_number: str, my_password: str) -> None:
 	# FACEBOOK のトップページにログインする
@@ -407,7 +482,7 @@ class FacebookScraper:
         password_elem.submit()
         sleep(2)
         if 'email' in self.driver.page_source and 'password' in self.driver.page_source:
-            print('ログインに失敗しました.')
+            print('ログインに失敗しました。最初からやり直してください。プログラムを終了します。')
             exit(0)
         self.__print_done_message_with_sleep(2)
         
@@ -435,16 +510,15 @@ class FacebookScraper:
 
     # ここから下は、ヘルパー関数のような役割のもの
 
-    def save_current_page_source(self):
+    def save_current_page_source(self, path_for_save: str):
 	#  分析用に現時点でのソースを保存する
-        PATH_FOR_SAVE = './current_source_minatoya.html'
-        with open(PATH_FOR_SAVE, mode='w') as f:
+        with open(path_for_save, mode='w') as f:
             f.write(self.driver.page_source)
-        print(f'ソースコードをセーブしました  保存場所 : {PATH_FOR_SAVE}')
+        print(f'ソースコードをセーブしました  保存場所 : {path_for_save}')
 
     def __get_number_of_reacted_people_from_button_elem(self, button_elem) -> int:
         """
-        リアクションした人の一覧を表示するボタンの部分のソースからその人数を取得する関数
+        リアクションした人の一覧を表示するボタンの部分からその人数を取得する関数
         button_elem の中には人数をテキストに持つ要素が２つあるので、そのうち一つを指定して、そこから返す
         """
         elem_has_number = button_elem.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.HAS_NUMBER_IN_BUTTON_DISPLAY.replace(' ', '.'))
@@ -453,7 +527,7 @@ class FacebookScraper:
             #ret = int(elem_has_number.text.replace(',', ''))
             ret = int(elem_has_number.get_attribute('innerHTML').replace(',', ''))
         except:
-            print('ERROR : in __get_number_of_reacted_people_from_button_elem')
+            print('ERROR  (in  __get_number_of_reacted_people_from_button_elem)')
             print(f'button_elem.innerHTML = {button_elem.get_attribute("innerHTML")}')
             print(f'elem_has_number.text = {elem_has_number.text}')
             print(f'elem_has_number.innerHTML = {elem_has_number.get_attribute("innerHTML")}')
@@ -462,12 +536,13 @@ class FacebookScraper:
     @staticmethod
     def get_profile_page_url_from_top_page_url(top_page_url: str) -> str:
         '''
-        その人のトップページのURLから基本データの載ってるページのURLを返す
+        その人のトップページのURLから基本データの載ってるページ（/about...）のURLを返す
         '''
+        profile_page_url = top_page_url
         if r'profile.php?id=' in top_page_url:
-            profile_page_url = top_page_url + '&sk=about'
+            profile_page_url += '&sk=about'
         else:
-            profile_page_url = top_page_url + '/about'
+            profile_page_url += '/about'
         return profile_page_url
 
     @staticmethod
@@ -525,8 +600,53 @@ def sleep_with_print(t):
 
 
 def stop(mess: str = 'STOP  (press enter to resume)'):
-    
     input(mess)
+
+
+
+def main():
+    if len(sys.argv) < 5:
+        print('引数が足りません。以下の値を実行時に引数として入力してください。')
+        print('[1] : ログインに使うメールアドレスまたは電話番号')
+        print('[2] : ログインに使うパスワード')
+        print('[3] : 対象とする投稿の数')
+        print('[4] : 対象とする FaceBook のページ')
+        print('[5] : 結果を保存するファイルのパス')
+        return
+    email_or_number  = sys.argv[1]       # ログインに使うメールアドレスまたは電話番号
+    password         = sys.argv[2]       # ログインに使うパスワード
+    number_of_posts  = int(sys.argv[3])  # 対象とする投稿の数
+    target_url       = sys.argv[4]       # 対象とする FaceBook のページ
+    answer_file_path = sys.argv[5]       # 結果を保存するファイルのパス
+
+    scraper = FacebookScraper(
+        email_or_number,
+        password,
+        False,
+    )
+
+    urls = scraper.get_urls_of_reacted_people(target_url, number_of_posts - 1, True)
+    for i, url in enumerate(urls):
+        print(f'urls[{i}] = {url}')
+    return
+    
+
+    test_send_message_by_messenger_to_reacted_people(target_url, number_of_posts, scraper)
+
+    return
+
+    # [{{}}] の形で帰る [{リアクションした人のURL : {情報の項目名(名前とか) : その人の情報}}] で各投稿ごとにリストで
+    info_dicts_of_reacted_people_per_posts = scraper.get_info_dicts_of_reacted_people_per_posts(target_url, number_of_posts)
+
+    
+    with open(answer_file_path, 'w') as f:
+        json.dump(info_dicts_of_reacted_people_per_posts, f, indent=4, ensure_ascii=False)
+    return 
+
+    
+if __name__ == '__main__':
+    #doctest.testmod()
+    main()
 
 
 
@@ -536,7 +656,7 @@ def test_get_urls_of_reacted_people_per_posts(target_url, number_of_posts, scrap
     for i, urls in enumerate(urls_per_posts, start=1):
         print(f'投稿 {i} について')
         for j, url in enumerate(urls, start=1):
-            print(f'    name: {scraper.get_full_name_by_top_page_url[url]}   url: {url}')
+            print(f'    name: {scraper.url2fullname[url]}   url: {url}')
         print()
     return
 
@@ -556,9 +676,9 @@ def test_get_info_dicts_of_reacted_people_per_posts(target_url, number_of_posts,
 def test_send_message_by_messenger_to_reacted_people(target_url, number_of_posts, scraper):
     # 各投稿にリアクション下人たちに、メッセージを送るテスト
 
-    # scraper.get_full_name_by_top_page_url を蓄積させるために呼び出す
+    # scraper.url2fullname を蓄積させるために呼び出す
     scraper.get_urls_of_reacted_people_per_posts(target_url, number_of_posts)
-    names_of_reacted_people = list(scraper.get_full_name_by_top_page_url.values())
+    names_of_reacted_people = list(scraper.url2fullname.values())
     for i, name in enumerate(names_of_reacted_people):
         print(f'    宛先 {i:3}  :  {name}')
     print('以上の人たちを宛先に送るメッセージ画面を開きいています ...')
@@ -599,41 +719,3 @@ def write_info_dicts_on_xl(info_dicts_of_reacted_people_per_posts: {}, xl_file_p
     wb.save(xl_file_path)
     print('エクセルファイルに結果を出力しました。')
 
-
-def main():
-    if len(sys.argv) < 5:
-        print('引数が足りません。以下の値を実行時に引数として入力してください。')
-        print('[1] : ログインに使うメールアドレスまたは電話番号')
-        print('[2] : ログインに使うパスワード')
-        print('[3] : 対象とする投稿の数')
-        print('[4] : 対象とする FaceBook のページ')
-        print('[5] : 結果を保存するファイルのパス')
-        return
-    email_or_number  = sys.argv[1]       # ログインに使うメールアドレスまたは電話番号
-    password         = sys.argv[2]       # ログインに使うパスワード
-    number_of_posts  = int(sys.argv[3])  # 対象とする投稿の数
-    target_url       = sys.argv[4]       # 対象とする FaceBook のページ
-    answer_file_path = sys.argv[5]       # 結果を保存するファイルのパス
-
-    scraper = FacebookScraper(
-        email_or_number,
-        password,
-        False,
-    )
-
-    test_send_message_by_messenger_to_reacted_people(target_url, number_of_posts, scraper)
-
-    return
-
-    # [{{}}] の形で帰る [{リアクションした人のURL : {情報の項目名(名前とか) : その人の情報}}] で各投稿ごとにリストで
-    info_dicts_of_reacted_people_per_posts = scraper.get_info_dicts_of_reacted_people_per_posts(target_url, number_of_posts)
-
-    
-    with open(answer_file_path, 'w') as f:
-        json.dump(info_dicts_of_reacted_people_per_posts, f, indent=4, ensure_ascii=False)
-    return 
-
-    
-if __name__ == '__main__':
-    #doctest.testmod()
-    main()
