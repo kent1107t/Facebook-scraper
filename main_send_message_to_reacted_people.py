@@ -1,6 +1,7 @@
 # リアクションした人たちにメッセージを送る
 import sys
 import json
+from pprint import pprint
 from facebook_scraper import FacebookScraper
 
 def main():
@@ -9,7 +10,7 @@ def main():
     my_email_or_number  = info_dict['my_email_or_number']
     my_password         = info_dict['my_password']
     target_top_page_url = info_dict['target_top_page_url']
-    
+
     # 今回のターゲットとなる投稿の情報を入力
     target_top_page_url = input('対象とする投稿をした人の FaceBook のトップページを入力してください : ')
     index_of_post = int(input('一番新しい投稿から数えたとき、何番目の投稿を対象とするのかを入力してください : '))
@@ -32,6 +33,7 @@ def main():
         my_password,
         False,
     )
+    
     # リアクションした人たちの URL を取得
     urls_of_reacted_people = scraper.get_urls_of_reacted_people(target_top_page_url, index_of_post)
     # メッセージの送信

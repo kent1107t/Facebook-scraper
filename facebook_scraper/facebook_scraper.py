@@ -106,7 +106,7 @@ class FacebookScraper:
         # メッセージ画面を開くボタンを押す（要素が存在しない場合は友達のみに制限してる）
         try:  open_elem = self.driver.find_element(by=By.XPATH, value=f"//div[@role='button'][@aria-label='メッセージ']")
         except:
-            print('このユーザーはメッセージを送れる人を「友達のみ」に制限しているのでスキップします。')
+            print('このユーザーはメッセージを送れる人を「友達のみ」に制限しているので、メッセージを送ることができません。')
             return
         self.driver.execute_script("arguments[0].click();", open_elem)
         sleep(0.4)
@@ -136,7 +136,7 @@ class FacebookScraper:
             # 確認する必要がなければそのまま出る
             if not need_confirm:  break
             # 入力し直す必要があるか確認し、必要がなければそのまま出る
-            print('-'*55, *list(map(lambda s: '    '+s, self.post_elems[index_of_post].text.split('\n')[:5])), '-'*55, sep='\n')
+            print('-'*55, *list(map(lambda s: '    '+s, self.post_elems[index_of_post].text.split('\n')[:7])), '-'*55, sep='\n')
             need_redo = ('y' != input('対象とする投稿は以上のものでよろしいでしょうか？\nよろしい場合は "y" を入力しエンターキーを押してください  :  '))
             if not need_redo:  break
             # 新しい投稿の番号を入力
@@ -157,57 +157,26 @@ class FacebookScraper:
     def get_urls_of_reacted_people_per_posts(
             self,
             target_top_page_url: str,       # 対象とする人のページ
-            number_of_target_posts: int,  # 対象とする投稿の数
-    ) -> [[str]]:
+            indexes_of_post: int,             # 対象とする投稿の、一番新しい投稿から見たときの番号 (0-indexed) (ソートされている必要はない)
+    ) -> {int: [str]}:
         '''
         各投稿について、リアクションした人の URL を返す関数
+        urls_per_posts = get_urls_of_reacted_people_per_posts(target, [0, 8, 2])  とすると、
+        len(urls_per_posts) = 3
+        urls_per_posts.keys() = [0, 2, 8]
+        urls_per_posts[2].values() = 2(0-indexed) 番目の投稿にリアクションした人たちの URL の文字列のリスト
         '''
-        # 投稿とボタンの要素を必要な分取得
-        self.__set_post_and_button_elems(target_top_page_url, number_of_target_posts)
-        # 各投稿要素について、ボタン要素を取得し（存在すれば リアクションした人数が0なら存在しない）、ボタン要素からリアクションした人たちの URL を取得する
-        urls_per_posts = [[] for _ in range(number_of_target_posts)]  # 投稿の数 x リアクションした人の数 の二次元リスト
-        print('各投稿について、リアクションした人達の FACEBOOK ページの URL を取得しています ... ')
-        for i, post_elem in enumerate(self.post_elems):
-            print(f'    投稿 {i+1:3} / {len(post_elems):3} について')
-            urls_per_posts[i] = []
-            # リアクションした人の数が 0 なら、ボタン要素も無いのでスキップ
-            if not self.__does_post_have_button_display_reacted_people(post_elem):
-                print('        リアクションした人の数は 0 です')
-                continue
-            button_elem = self.button_elems[self.post_index2button_index[i]]
-            # 人の一覧を表示するボタン要素から、その一覧の人たちのトップページの URL を取得する
-            urls_per_posts[i] = self.__get_urls_of_reacted_people_from_button_elem_display(button_elem, current_button_index)
-            current_button_index += 1
-        self.__print_done_message_with_sleep(0.1)
+        indexes_of_post.sort()
+        urls_per_posts = {}
+        size_all_indexes = len(indexes_of_post)
+        for i, index_of_post in enumerate(indexes_of_post, start=1):
+            print(f'    ({i:3} / {size_all_indexes:3}) 投稿 {index_of_post:3} について')
+            urls_per_posts[index_of_post] = self.get_urls_of_reacted_people(target_top_page_url, index_of_post)
         return urls_per_posts
 
     def __does_post_have_button_display_reacted_people(self, post_elem):
         # もらった投稿の要素 post_elem の中にリアクションした人を表示するボタン要素があるかどうかを返す
         return  post_elem.get_attribute("innerHTML").count(self.classnames.BUTTON_DISPLAY_REACTED_PEOPLE) > 0
-
-    def get_info_dicts_of_reacted_people_per_posts(
-            self,
-            target_top_page_url: str,       # 対象とする人のページ
-            number_of_target_posts: int,  # 対象とする投稿の数
-    ) -> [{}]:
-        '''
-        引数の人の投稿にリアクションした人の情報の dict を、各投稿の分だけリストにして返す
-        len(返り値)         -->   対象とする投稿の数 (number_of_target_posts)
-        返り値[i].keys()    -->   i 番目投稿にリアクションした人たちの URL の集合
-        返り値[i].values()  -->   i 番目投稿にリアクションした人たちの情報(dict)の集合
-        '''
-        # 対象の投稿数までのすべての投稿について、リアクションした人たちの URL を取得
-        urls_of_reacted_people_per_posts = self.get_urls_of_reacted_people_per_posts(target_top_page_url, number_of_target_posts)
-        #print('TOUR in top page urls of reacted people')
-        print('リアクションした人たちのページから情報を取得します ... ')
-        info_dicts_per_posts = [{} for _ in range(number_of_target_posts)]  # 投稿の数だけ、URL をキーとしたその人の情報の辞書を返す
-        for i, top_page_urls in enumerate(urls_of_reacted_people_per_posts):
-            print(f'    投稿 {i+1:3} / {number_of_target_posts:3} について')
-            for j, top_page_url in enumerate(top_page_urls):
-                print(f'        URL {j+1:3} / {len(top_page_urls):3}  {top_page_url}')
-                info_dicts_per_posts[i][top_page_url] = self.get_info_dict_by_top_page_url(top_page_url)
-        return info_dicts_per_posts
-
 
     def get_info_dict_by_top_page_url(
             self,
@@ -370,7 +339,6 @@ class FacebookScraper:
         '''
         引数でもらった一覧を表示するボタンを押して、表示された人たちの URL をリストで返す関数
         '''
-        urls = []
         # 今見てるボタン要素の部分のソースから、この投稿にリアクションした人の人数を取得
         number_of_reacted_people = self.__get_number_of_reacted_people_from_button_elem(display_button)
         # ボタンをクリックして一覧を表示
@@ -381,7 +349,7 @@ class FacebookScraper:
         self.__load_page_display_reacted_people_until_get_urls(number_of_reacted_people)
         urls = self.__get_top_page_urls_of_reacted_people_on_displayed_page()
 
-        # 人たちのリンクのグループを一つにしておくために（開きっぱだと残ってしまう）今回のをちゃんと閉じとく
+        # 人たちのリンクのグループを一つにしておくために（開きっぱだとリンクのグループ要素が残ってしまい、どのグループが今回表示されたものかわからなくなるから）今回のをちゃんと閉じとく
         close_button = self.driver.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.CLOSE_BUTTON_ON_DISPLAYED_PAGE.replace(' ', '.'))
         self.driver.execute_script("arguments[0].click();", close_button)
         # 読み込んだ段階で、一覧で表示されてる人たちの URL を取得し返す
@@ -404,11 +372,10 @@ class FacebookScraper:
         # ボタン要素と、何番目の投稿が何番目のボタンに対応してるかの辞書を取得
         for i, post_elem in enumerate(self.post_elems):
             if self.__does_post_have_button_display_reacted_people(post_elem):
-                # インデックスの変換を記録
+                # 投稿とボタンの間の、インデックスの変換を記録
                 self.post_index2button_index[i] = len(self.button_elems)
                 # ボタン要素を保存
                 self.button_elems.append(post_elem.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.BUTTON_DISPLAY_REACTED_PEOPLE.replace(' ', '.')))
-
 
     def __get_post_elems_by_url(
             self, 
@@ -575,12 +542,6 @@ class FacebookScraper:
         sleep(time_seconds)
 
 
-def sleep_with_print(t):
-    print(f'start sleep {t}[sec] ... ', end='', flush=True)
-    sleep(t)
-    print('end')
-
-
 def stop(mess: str = 'STOP  (press enter to resume)'):
     input(mess)
 
@@ -622,17 +583,6 @@ if __name__ == '__main__':
     #doctest.testmod()
     main()
 
-
-
-def test_get_urls_of_reacted_people_per_posts(target_url, number_of_posts, scraper):
-    # 各投稿にリアクションした人たちの URL を取得するテスト
-    urls_per_posts = scraper.get_urls_of_reacted_people_per_posts(target_url, number_of_posts)
-    for i, urls in enumerate(urls_per_posts, start=1):
-        print(f'投稿 {i} について')
-        for j, url in enumerate(urls, start=1):
-            print(f'    name: {scraper.url2fullname[url]}   url: {url}')
-        print()
-    return
 
 def test_get_info_dict_by_top_page_url(url, scraper):
     # 個人のページで get_info_dict_by_top_page_url(url) をテスト
