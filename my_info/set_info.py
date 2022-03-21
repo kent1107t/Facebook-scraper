@@ -1,13 +1,15 @@
 import json
+from os import path
 from pprint import pprint
 
 
 info_fpath = './info.json'
 
+info_dict = {}
 print('今の値')
 # 今の info.json を辞書として読み込み
-with open(info_fpath) as f:
-    info_dict = json.load(f)
+if path.exists(info_fpath):
+    with open(info_fpath) as f:  info_dict = json.load(f)
 pprint(info_dict, width=40)
 
 info_dict  = {}
