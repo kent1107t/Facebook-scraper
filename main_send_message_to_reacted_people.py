@@ -1,23 +1,19 @@
 # リアクションした人たちにメッセージを送る
 import sys
-import importlib
-import facebook_scraper
-#importlib.reload(facebook_scraper)
+import json
 from facebook_scraper import FacebookScraper
 
 def main():
-    if len(sys.argv) < 4:
-        print('引数が足りません。以下の値を実行時に引数として入力してください。')
-        print('[1] : 一番新しい投稿から数えたとき、何番目の投稿を対象とするのか')
-        print('[2] : 対象とする投稿をした人の FaceBook のトップページ')
-        print('[3] : ログインに使うパスワード')
-        print('[4] : ログインに使うメールアドレスまたは電話番号')
-        return
-
-    index_of_post       = int(sys.argv[1]) - 1
-    target_top_page_url = sys.argv[2]
-    password            = sys.argv[3]
-    email_or_number     = sys.argv[4]
+    # ログインのための情報などを保存したファイルから読み込み
+    with open('my_info/info.json') as f:  info_dict = json.load(f)
+    my_email_or_number  = info_dict['my_email_or_number']
+    my_password         = info_dict['my_password']
+    target_top_page_url = info_dict['target_top_page_url']
+    
+    # 今回のターゲットとなる投稿の情報を入力
+    target_top_page_url = input('対象とする投稿をした人の FaceBook のトップページを入力してください : ')
+    index_of_post = int(input('一番新しい投稿から数えたとき、何番目の投稿を対象とするのかを入力してください : '))
+    index_of_post -= 1  # 0-indexed に
 
     # メッセージの入力
     text_for_send = ''
@@ -32,16 +28,16 @@ def main():
 
     # ログインとか
     scraper = FacebookScraper(
-        email_or_number,
-        password,
+        my_email_or_number,
+        my_password,
         False,
     )
     # リアクションした人たちの URL を取得
     urls_of_reacted_people = scraper.get_urls_of_reacted_people(target_top_page_url, index_of_post)
     # メッセージの送信
     size = len(urls_of_reacted_people)
-    for i, url in enumerate(urls_of_reacted_people):
-        print(f'{i} / {size}   url = {url}')
+    for i, url in enumerate(urls_of_reacted_people, start=1):
+        print(f'{i:3}人目 / 全{size:3}人   url = {url}')
         scraper.send_message(url, text_for_send)
 
 
