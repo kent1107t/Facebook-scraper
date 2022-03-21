@@ -154,25 +154,25 @@ class FacebookScraper:
         self.__print_done_message_with_sleep(0.1)
         return urls
 
-    def get_urls_of_reacted_people_per_posts(
+    def get_urls_of_reacted_people_per_post(
             self,
             target_top_page_url: str,       # 対象とする人のページ
-            indexes_of_post: int,             # 対象とする投稿の、一番新しい投稿から見たときの番号 (0-indexed) (ソートされている必要はない)
+            indexes_of_post: [int],         # 対象とする投稿の、一番新しい投稿から見たときの番号 (0-indexed) (ソートされている必要はない)
     ) -> {int: [str]}:
         '''
         各投稿について、リアクションした人の URL を返す関数
-        urls_per_posts = get_urls_of_reacted_people_per_posts(target, [0, 8, 2])  とすると、
-        len(urls_per_posts) = 3
-        urls_per_posts.keys() = [0, 2, 8]
-        urls_per_posts[2].values() = 2(0-indexed) 番目の投稿にリアクションした人たちの URL の文字列のリスト
+        urls_per_post = get_urls_of_reacted_people_per_post(target, [0, 8, 2])  とすると、
+        len(urls_per_post) = 3
+        urls_per_post.keys() = [0, 2, 8]
+        urls_per_post[2].values() = 2(0-indexed) 番目の投稿にリアクションした人たちの URL の文字列のリスト
         '''
         indexes_of_post.sort()
-        urls_per_posts = {}
+        urls_per_post = {}
         size_all_indexes = len(indexes_of_post)
         for i, index_of_post in enumerate(indexes_of_post, start=1):
-            print(f'    ({i:3} / {size_all_indexes:3}) 投稿 {index_of_post:3} について')
-            urls_per_posts[index_of_post] = self.get_urls_of_reacted_people(target_top_page_url, index_of_post)
-        return urls_per_posts
+            print(f'({i:3} / {size_all_indexes:3}) 投稿 {index_of_post+1:3} について')
+            urls_per_post[index_of_post] = self.get_urls_of_reacted_people(target_top_page_url, index_of_post)
+        return urls_per_post
 
     def __does_post_have_button_display_reacted_people(self, post_elem):
         # もらった投稿の要素 post_elem の中にリアクションした人を表示するボタン要素があるかどうかを返す
@@ -221,6 +221,7 @@ class FacebookScraper:
             '名前': self.driver.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.FULL_NAME.replace(' ', '.')).text,
             'URL' : top_page_url,
         }
+        print(f'{info_dict["名前"]}さん（{info_dict["URL"]}）についての情報を取得しています...')
         self.KEYS_OF_INFO_DICT = set()
         self.KEYS_OF_INFO_DICT |= set(info_dict.keys())
         self.KEYS_OF_INFO_DICT |= {keyname for mark2keyname in aboutthing2mark2keyname.values() for keyname in mark2keyname.values()}
@@ -251,7 +252,6 @@ class FacebookScraper:
                     value_elem = item_elem.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.VALUE_OF_ITEM_OF_ABOUT.replace(' ', '.'))
                     read_value = value_elem.text
                 info_dict[keyname] = read_value
-                print(f'        info_dict[{keyname}] = {info_dict[keyname]}')
         return info_dict
     
     
@@ -306,7 +306,7 @@ class FacebookScraper:
 	    # 今読み込めてるリアクションした人のページのURLリストを取得し、その数を更新
             cur_count_reacted_people = len(self.__get_top_page_urls_of_reacted_people_on_displayed_page())
             if cur_count_reacted_people > prv_count_reacted_people:
-                print(f'         （読み込み中） 現在取得されている人数 : {cur_count_reacted_people} / {number_of_reacted_people}')
+                print(f' （リアクションした人達を読み込み中） 現在取得されている人数 : {cur_count_reacted_people} / {number_of_reacted_people}')
                 prv_count_reacted_people = cur_count_reacted_people
                 stagnation_count = 0
             else:
@@ -315,7 +315,7 @@ class FacebookScraper:
             if cur_count_reacted_people == number_of_reacted_people:  break
             # 停滞がある程度続いてたら終了
             if stagnation_count > 60:
-                print(f'        停滞してるので終了します。')
+                print(f'  停滞してるので終了します。')
                 break
             '''
             # low_limit <= dy <= up_limit の範囲で、残りの読み込めてない要素数に応じて、下にスクロール
@@ -385,10 +385,10 @@ class FacebookScraper:
         '''
         調査対象の投稿を読み込んでいき、与えられた数だけ投稿要素を返す関数
         '''
-        print('対象のページにアクセスしています ... ')
         if not target_top_page_url == self.driver.current_url:
+            print('対象のページにアクセスしています ... ')
             self.driver.get(target_top_page_url)
-        self.__print_done_message_with_sleep(2)
+            self.__print_done_message_with_sleep(2)
 
         print(f'投稿を読み込んでいます ... （取得する投稿の数 : {number_of_target_posts}）')
         post_elems = []  # 返り値
@@ -399,15 +399,15 @@ class FacebookScraper:
             # 今のすべての投稿の要素を取得
             post_elems = self.driver.find_elements(by=By.CSS_SELECTOR, value='.'+self.classnames.POSTS.replace(' ', '.'))
             cur_posts_count = len(post_elems)
+            # 与えられた必要数を上回ってれば読み込み終了
+            if cur_posts_count >= number_of_target_posts:  break
+
             if cur_posts_count > prv_posts_count:
                 print(f'    （読み込み中） 現在取得されている投稿数 : {cur_posts_count} / {number_of_target_posts}')
                 prv_posts_count = cur_posts_count
                 stagnation_count = 0
             else:
                 stagnation_count += 1
-            # 与えられた必要数を上回ってれば読み込み終了
-            if cur_posts_count >= number_of_target_posts:  break
-
             # 下に読み込みを続けるだけだと、遅い時に余計遅い感じがするから、一旦上にも上げるようにしてる
             page.send_keys(Keys.PAGE_UP)
             sleep(0.4)
@@ -571,11 +571,11 @@ def main():
     return
 
     # [{{}}] の形で帰る [{リアクションした人のURL : {情報の項目名(名前とか) : その人の情報}}] で各投稿ごとにリストで
-    info_dicts_of_reacted_people_per_posts = scraper.get_info_dicts_of_reacted_people_per_posts(target_url, number_of_posts)
+    info_dicts_of_reacted_people_per_post = scraper.get_info_dicts_of_reacted_people_per_post(target_url, number_of_posts)
 
     
     with open(answer_file_path, 'w') as f:
-        json.dump(info_dicts_of_reacted_people_per_posts, f, indent=4, ensure_ascii=False)
+        json.dump(info_dicts_of_reacted_people_per_post, f, indent=4, ensure_ascii=False)
     return 
 
     
@@ -590,44 +590,10 @@ def test_get_info_dict_by_top_page_url(url, scraper):
     with open('data_of_the_person.json', 'w') as f:
         json.dump(info_dict, f, indent=4, ensure_ascii=False)
 
-def test_get_info_dicts_of_reacted_people_per_posts(target_url, number_of_posts, scraper):
+def test_get_info_dicts_of_reacted_people_per_post(target_url, number_of_posts, scraper):
     # 各投稿にリアクションした人たちの 情報 を取得するテスト
-    info_dicts_of_reacted_people_per_posts = scraper.get_info_dicts_of_reacted_people_per_posts(target_url, number_of_posts)
-    with open('info_dicts_of_reacted_people_per_posts.json', 'w') as f:
-        json.dump(info_dicts_of_reacted_people_per_posts, f, indent=4, ensure_ascii=False)
+    info_dicts_of_reacted_people_per_post = scraper.get_info_dicts_of_reacted_people_per_post(target_url, number_of_posts)
+    with open('info_dicts_of_reacted_people_per_post.json', 'w') as f:
+        json.dump(info_dicts_of_reacted_people_per_post, f, indent=4, ensure_ascii=False)
     return 
-
-def write_info_dicts_on_xl(info_dicts_of_reacted_people_per_posts: {}, xl_file_path: str) -> None:
-    # xl_file_path のエクセルファイルに、リアクションした人たちの情報を書き込む
-    import openpyxl
-    # ブック・シートを取得
-    wb = openpyxl.load_workbook(xl_file_path)
-    sheet = wb['Sheet1']
-    # 表示順で並べたキー集合
-    keynames_on_display_order = [
-        'URL',
-        '名前',
-        '在住',
-        '勤務先',
-        '電話番号',
-        '出身地',
-        '出身校',
-        '交際',
-    ]
-    # 項目のキーから、その情報を表示する列のインデックス
-    keyname2column = {keyname: i for i, keyname in enumerate(keynames_on_display_order, start=1)}
-    # 今の書き込む行
-    row4write = 1
-    # 各投稿ごとに
-    for info_dicts_of_reacted_people in info_dicts_of_reacted_people_per_posts:
-        # 各人ごとに
-        for url, info_dict in info_dicts_of_reacted_people.items():
-            # 各情報の項目ごとに
-            for key, value in info_dict.items():
-                sheet.cell(row=row4write, column=keyname2column[key], value=value)
-            row4write += 1
-        row4write += 1
-
-    wb.save(xl_file_path)
-    print('エクセルファイルに結果を出力しました。')
 
