@@ -11,7 +11,7 @@ def get_info_dict_of_reacted_people_per_post(
         target_top_page_url: str,   # 対象の投稿があるトップページ
         indexes_of_post: [int],     # 対象の投稿の番号
 ) -> {int: {str: {}}}:  # {index_of_post: {url: {urlの人の各情報の辞書}}}
-    # リアクションした人たちの URL を取得  {index_of_post: url} の形
+    # リアクションした人たちの URL を取得  {index_of_post: [url]} の形
     urls_of_reacted_people_per_post = scraper.get_urls_of_reacted_people_per_post(target_top_page_url, indexes_of_post)
     # 取得した人たちに対して、ページから情報を取得
     return {index: {url: scraper.get_info_dict_by_top_page_url(url) for url in urls} for index, urls in urls_of_reacted_people_per_post.items()}
@@ -26,6 +26,7 @@ def write_info_dicts_on_xl(
     # ブック・シートを取得
     wb = openpyxl.load_workbook(xl_file_path)
     sheet = wb['Sheet1']
+    # scraper.KEYS_OF_INFO_DICT にキー集合が入ってる
     # 表示順で並べたキー集合
     keynames_on_display_order = [
         'URL',
@@ -59,7 +60,8 @@ def write_info_dicts_on_xl(
 def main():
 
     # ログインのための情報などを保存したファイルから読み込み
-    with open('my_info/info.json') as f:  my_info_dict = json.load(f)
+    my_info_fpath = path.join(path.dirname(path.abspath(__file__)), 'my_info', 'info.json')
+    with open(my_info_fpath) as f:  my_info_dict = json.load(f)
     my_email_or_number  = my_info_dict['my_email_or_number']
     my_password         = my_info_dict['my_password']
     target_top_page_url = my_info_dict['target_top_page_url']
@@ -70,7 +72,8 @@ def main():
     # 保存するエクセルのパス
     xl_file_path = path.join(path.dirname(path.abspath(__file__)), 'info_of_reacted_people.xlsx')
     if not path.exists(xl_file_path):
-        if 'y' != input(f'パス {xl_file_path} は存在しません。結果はエクセルファイルに保存されませんがよろしいですか？\n[y / n] : '):
+        if 'y' != input(f'パス {xl_file_path} は存在しません。結果はエクセルファイルに保存されませんがよろしいですか？\nよろしい場合は "y" を、やり直す場合はそれ以外の文字を入力してください。 : '):
+            print('プログラムを終了します。')
             return
 
     # ログインとか

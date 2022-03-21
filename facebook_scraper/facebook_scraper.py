@@ -67,7 +67,7 @@ class ClassNames:
     # Messenger のボタン
     MESSENGER_BUTTON = 'oajrlxb2 qu0x051f esr5mh6w e9989ue4 r7d6kgcz nhd2j8a9 p7hjln8o kvgmc6g5 cxmmr5t8 oygrvhab hcukyx3x i1ao9s8h esuyzwwr f1sip0of abiwlrkh p8dawk7l lzcic4wl bp9cbjyn s45kfl79 emlxlaya bkmhp75w spb7xbtv rt8b4zig n8ej3o3l agehan2d sk4xxmp2 rq0escxv j83agx80 taijpn5t jb3vyjys rz4wbd8a qt6c0cv9 a8nywdso l9j0dhe7 qypqp5cg q676j6op tdjehn4e'
 
-    # 他の人のページでメッセージ画面を開いたときの、送信するテキストボックス
+    # 他の人のページでメッセージ画面を開いたときの、送信する文を入れるテキストボックス
     TEXTBOX_FOR_MESSAGE = 'oo9gr5id lzcic4wl l9j0dhe7 gsox5hk5 buofh1pr tw4czcav cehpxlet hpfvmrgz eg9m0zos notranslate'
 
 
@@ -98,7 +98,7 @@ class FacebookScraper:
     def send_message(
             self,
             url_of_target_person: str,  # 対象の人のトップページの URL
-            text_for_send: str,         # メッセージとして送る文字列
+            text_of_message: str,         # メッセージとして送る文字列
     ) -> None:
         # 対象の人のトップページに移動
         self.driver.get(url_of_target_person)
@@ -110,10 +110,12 @@ class FacebookScraper:
             return
         self.driver.execute_script("arguments[0].click();", open_elem)
         sleep(0.4)
-        # テキストを入力
+        # テキストを入力 (改行をそのまま入れると、改行ごとに送信されてしまう)
         text_elem = self.driver.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.TEXTBOX_FOR_MESSAGE.replace(' ', '.'))
-        text_elem.send_keys(text_for_send)
-        sleep(0.3)
+        for splited_text_of_message in text_of_message.split('\n'):
+            text_elem.send_keys(splited_text_of_message)
+            text_elem.send_keys(Keys.SHIFT, Keys.ENTER)
+
         # 送信ボタンを押す（メッセージ文が空の場合はボタンが出てないので、一応確認してから）
         if text_elem.text != '':
             send_elem = self.driver.find_element(by=By.XPATH, value=f"//div[@role='button'][@aria-label='Enterを押して送信']")
@@ -170,7 +172,7 @@ class FacebookScraper:
         urls_per_post = {}
         size_all_indexes = len(indexes_of_post)
         for i, index_of_post in enumerate(indexes_of_post, start=1):
-            print(f'({i:3} / {size_all_indexes:3}) 投稿 {index_of_post+1:3} について')
+            print(f'({i:_^{len(str(size_all_indexes))}} / {size_all_indexes}) 投稿 {index_of_post+1} について')
             urls_per_post[index_of_post] = self.get_urls_of_reacted_people(target_top_page_url, index_of_post)
         return urls_per_post
 
@@ -236,6 +238,7 @@ class FacebookScraper:
             try:
                 group_elem = self.driver.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.GROUP_OF_ABOUT.replace(' ', '.'))
             except:
+                print('上手く情報を取ることができませんでした。ビジネスアカウントの可能性があります。')
                 return info_dict  # ビジネスアカウントの場合
             # 各項目の要素を取得（住んだことがある場所 だと、居住地・出身地 とか）
             item_elems = group_elem.find_elements(by=By.CSS_SELECTOR, value='.'+self.classnames.ITEM_OF_ABOUT.replace(' ', '.'))
@@ -419,7 +422,7 @@ class FacebookScraper:
         
     def login_to_facebook_top_page(self, my_email_or_number: str, my_password: str) -> None:
 	# FACEBOOK のトップページにログインする
-        print(f'FACEBOOK のトップページでログインしています ... ')
+        print(f'Facebook のトップページでログインしています ... ')
         self.driver.get(self.FACEBOOK_TOP_URL)
         # 入力欄の要素を取得
         email_or_number_elem = self.driver.find_element(by=By.NAME, value='email')
@@ -542,8 +545,8 @@ class FacebookScraper:
         sleep(time_seconds)
 
 
-def stop(mess: str = 'STOP  (press enter to resume)'):
-    input(mess)
+def stop(mess: str = 'press enter to resume'):
+    input('(in stop)  '+mess)
 
 
 
