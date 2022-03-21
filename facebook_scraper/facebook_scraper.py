@@ -53,7 +53,7 @@ class ClassNames:
     FRIEND_OR_GOOD_BUTTON = 'd2edcug0 hpfvmrgz qv66sw1b c1et5uql b0tq1wua a8c37x1j fe6kdd0r mau55g9w c8b282yb keod5gw0 nxhoafnm aigsh9s9 d9wwppkn hrzyx87i jq4qci2q a3bd9o3v lrazzd5p a57itxjd'
 
     # プロフィールページの、その人の名前が入ってるクラス名
-    FULL_NAME = 'gmql0nx0 l94mrbxd p1ri9a11 lzcic4wl'
+    FULL_NAME = 'd2edcug0 hpfvmrgz qv66sw1b c1et5uql b0tq1wua a8c37x1j fe6kdd0r mau55g9w c8b282yb keod5gw0 nxhoafnm aigsh9s9 qg6bub1s teo7jy3c mhxlubs3 p5u9llcw hnhda86s oo9gr5id hzawbc8m'
     # プロフィールページの、各情報のリストのグループのクラス名
     #GROUP_OF_ABOUT = 'buofh1pr'  グループの一番上のクラス名
     GROUP_OF_ABOUT = 'dati1w0a tu1s4ah4 f7vcsfb0 discj3wi'  # グループの上から二番目のクラス名
@@ -218,6 +218,7 @@ class FacebookScraper:
         # 基本データのページを取得
         profile_page_url = self.get_profile_page_url_from_top_page_url(top_page_url)
         self.driver.get(profile_page_url)
+        sleep(1)
         # 返り値の辞書 最初に名前と URL を入れとく
         info_dict = {
             '名前': self.driver.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.FULL_NAME.replace(' ', '.')).text,
@@ -232,7 +233,9 @@ class FacebookScraper:
             if not keyname in info_dict:  info_dict[keyname] = ''
         # それぞれの項目についてまわっていく
         for about_thing, mark2keyname in aboutthing2mark2keyname.items():
-            self.driver.get(f'{profile_page_url}_{about_thing}')
+            new_url = f'{profile_page_url}_{about_thing}'
+            if self.driver.current_url != new_url:
+                self.driver.get(new_url)
             # 項目が所属してる上のクラスの要素を取得 一応項目から直接取るんじゃなくて、一回グループとして取る
             sleep(0.4)
             try:
@@ -438,7 +441,7 @@ class FacebookScraper:
             exit(0)
         self.__print_done_message_with_sleep(2)
         
-    def __get_driver(self, wait_time_until_find_elems: int=10) -> selenium.webdriver.chrome.webdriver.WebDriver:
+    def __get_driver(self, wait_time_until_find_elems: int=30) -> selenium.webdriver.chrome.webdriver.WebDriver:
         # 設定されたオプションと、もらった要素取得時の待機時間から、Chrome のドライバーを返す関数
         self.wait_time_until_find_elems = wait_time_until_find_elems
         print('Chrome を起動します ... ')
