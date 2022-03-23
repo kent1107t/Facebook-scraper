@@ -103,6 +103,9 @@ class FacebookScraper:
         # 対象の人のトップページに移動
         self.driver.get(url_of_target_person)
         sleep(0.5)
+        # 名前を取得し、文字列に組み込む
+        name_of_target_person = self.driver.find_element(by=By.CSS_SELECTOR, value='.'+self.classnames.FULL_NAME.replace(' ', '.')).text
+        text_of_message = text_of_message.replace('{NAME}', name_of_target_person)
         # メッセージ画面を開くボタンを押す（要素が存在しない場合は友達のみに制限してる）
         try:  open_elem = self.driver.find_element(by=By.XPATH, value=f"//div[@role='button'][@aria-label='メッセージ']")
         except:
@@ -115,6 +118,11 @@ class FacebookScraper:
         for splited_text_of_message in text_of_message.split('\n'):
             text_elem.send_keys(splited_text_of_message)
             text_elem.send_keys(Keys.SHIFT, Keys.ENTER)
+
+        if False:  # デモとして見せる場合
+            stop('送る前の文字列です。（この後メッセージ本文は削除され、今回送られることはありません。）')
+            text_elem.send_keys(Keys.CONTROL, 'a')
+            text_elem.send_keys(Keys.DELETE)
 
         # 送信ボタンを押す（メッセージ文が空の場合はボタンが出てないので、一応確認してから）
         if text_elem.text != '':

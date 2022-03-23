@@ -1,2 +1,2 @@
-Hello!
+Hello, {NAME}!
 Nice to meet you.
